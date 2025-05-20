@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>brainrot</title>
+    <style>
+        body { font-family: sans-serif; padding: 2em; background: #dddddd; color: #000000; }
+        .chatbox { max-width: 700px; margin: 0 auto; }
+        .message { margin: 1em 0; padding: 1em; border-radius: 10px; }
+        .user { background: #cdd7e9; align-self: flex-end; }
+        .bot { background: #a5a5a5; }
+        .history { display: flex; flex-direction: column; gap: 0.5em; }
+    </style>
+</head>
+<body>
+    <div class="chatbox">
+        <h2>Brainrot Chatgpt</h2>
+        <div class="history" id="chat-history">
+            {% for pair in history %}
+                <div class="message user">{{ pair.user }}</div>
+                <div class="message bot">{{ pair.bot }}</div>
+            {% endfor %}
+        </div>
+        <input type="text" id="user-input" placeholder="type something" style="width:80%;">
+        <button onclick="send()">brainrot!</button>
+    </div>
+
+    <script>
+        const chatHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
+
+        async function send() {
+            const input = document.getElementById("user-input");
+            const userMessage = input.value.trim();
+            if (!userMessage) return;
+
+            // Add user message to UI
+            appendMessage(userMessage, "user");
+            input.value = "";
+
+            const response = await fetch("/send/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCSRFToken()
+                },
+                body: JSON.stringify({
+                    message: userMessage,
+                    history: chatHistory
+                })
+            });
+
+            const data = await response.json();
+            if (data.response) {
+                appendMessage(data.response, "bot");
+                chatHistory.push({ user: userMessage, bot: data.response });
+                localStorage.setItem('chat_history', JSON.stringify(chatHistory));
+            } else {
+                appendMessage("💀 error: " + (data.error || "unknown"), "bot");
+            }
+        }
+
+        function appendMessage(text, role) {
+            const msg = document.createElement("div");
+            msg.className = "message " + role;
+            msg.textContent = text;
+            document.getElementById("chat-history").appendChild(msg);
+        }
+
+        function getCSRFToken() {
+            return document.cookie
+                .split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+        }
+
+        // Restore messages on load
+        window.onload = () => {
+            chatHistory.forEach(pair => {
+                appendMessage(pair.user, "user");
+                appendMessage(pair.bot, "bot");
+            });
+        }
+    </script>
+</body>
+</html>
